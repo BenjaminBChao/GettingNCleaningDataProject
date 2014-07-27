@@ -11,8 +11,10 @@ trainData <- data.table(read.table("./UCI HAR Dataset/train/X_train.txt", header
 ActivityTrain <- data.table(read.table("./UCI HAR Dataset/train/y_train.txt", header=FALSE))
 SubjectTrain <- data.table(read.table("./UCI HAR Dataset/train/subject_train.txt", header=FALSE))
 
-#Merge the training and the test data sets
+
+#Requirement 1: Merges the training and the test set to create one data set
 #First, we combine rows 
+
 dtSubject <- rbind(SubjectTrain, SubjectTest)
 setnames(dtSubject, "V1", "subject")
 dtActivity <- rbind(ActivityTrain, ActivityTest)
@@ -22,44 +24,42 @@ ConsolidatedData <- rbind(testData, trainData)
 dtSubject <- cbind(dtSubject, dtActivity)
 ConsolidatedData <- cbind(dtSubject, ConsolidatedData)
 ConsolidatedData <- data.table(ConsolidatedData)
-
 #Set key
 setkey(ConsolidatedData, subject, activityNum)
 
 
-#Extract only the mean and standard deviation from measurements/attributes/features
+#Requirement 2: Extract only the mean and standard deviation from measurements/attributes/features
 #First, we read/load the features.txt into R
-
 features <- data.table(read.table("./UCI HAR Dataset/features.txt", header=FALSE))
 setnames(features, names(features), c("featureNum", "featureName"))
-
 #Now, we use subset() to extarct mean & sd
 features <- features[grep("mean\\(\\)|std\\(\\)", featureName)]
-
 #Convert the colum numbers to a vector of variable names matching columns in ConsolidatedData
 features$featureCode <- features[, paste0("V",featureNum)]
-
 #Subset these variables by variable names
-
 select <- c(key(ConsolidatedData), features$featureCode)
 ConsolidatedData <- ConsolidatedData[, select, with = FALSE]
 
-#Use Descriptive activity names
 
+#Requirement 3: Use Descriptive activity names to name the activities in the data set.
 #Read activity_labels.txt file. This file will help us add descriptiove names to the activities
 ActivityNames <- data.table(read.table("./UCI HAR Dataset/activity_labels.txt", header=FALSE))
 setnames(ActivityNames, names(ActivityNames), c("activityNum", "activityName"))
+
+
+#Requirement 4: Appropriately labels the data set with the descriptive activity names
 #Merge activity labels
 ConsolidatedData <- data.table(merge(ConsolidatedData, ActivityNames, by = "activityNum", all.x=TRUE))
 #Add activityName as a key
 setkey(ConsolidatedData, subject, activityNum, activityName)
-
 #Melt the time-series data table and reshape it from a short & wide format to a tall & narrow format.
 ConsolidatedData <- data.table(melt(ConsolidatedData, key(ConsolidatedData), variable.name = "featureCode"))
-
 #Merge activity name
 ConsolidatedData <- merge(ConsolidatedData, features[, list(featureNum, featureCode, featureName)], by = "featureCode", all.x = TRUE)
 ConsolidatedData <- data.table(ConsolidatedData)
+
+
+#Requirement 5: Create a second independent tidy data set with the average of each variable for each activity and each subject
 #Create Tidy Data set
 tidy <- with(ConsolidatedData, tapply(value, list(subject, activityName), mean))
 write.table(tidy, "tidy.txt", sep="\t")
